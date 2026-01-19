@@ -86,6 +86,21 @@ if DEBUG.lower() == "true":
 USER_AGENT = "GitHubSampleWebApp/AsyncAzureOpenAI/1.0.0"
 
 
+def model_supports_sampling_params(model_name: str) -> bool:
+    if not model_name:
+        return True
+    unsupported_prefixes = ("o1", "o3", "o4")
+    model_prefix = model_name.strip().lower()
+    return not model_prefix.startswith(unsupported_prefixes)
+
+
+def model_requires_default_top_p(model_name: str) -> bool:
+    if not model_name:
+        return False
+    model_prefix = model_name.strip().lower()
+    return model_prefix.startswith("gpt-5")
+
+
 # Frontend Settings via Environment Variables
 frontend_settings = {
     "auth_enabled": app_settings.base_settings.auth_enabled,
@@ -290,6 +305,11 @@ def prepare_model_args(request_body, request_headers):
         "stream": app_settings.azure_openai.stream,
         "model": app_settings.azure_openai.model
     }
+    if not model_supports_sampling_params(app_settings.azure_openai.model):
+        model_args.pop("temperature", None)
+        model_args.pop("top_p", None)
+    elif model_requires_default_top_p(app_settings.azure_openai.model):
+        model_args["top_p"] = 1
 
     if len(messages) > 0:
         if messages[-1]["role"] == "user":
